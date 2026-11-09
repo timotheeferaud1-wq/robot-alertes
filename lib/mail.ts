@@ -47,6 +47,23 @@ export function construireMail(resultats: Resultat[], test = false) {
   return { sujet, html };
 }
 
+export type LigneJournal = { date: Date; sujet: string; statut: string };
+
+/** Les derniers mails envoyés par le robot, lus directement chez Resend (aucune base de données nécessaire). */
+export async function journalMails(limite = 30): Promise<{ lignes: LigneJournal[]; erreur?: string }> {
+  if (!process.env.RESEND_API_KEY) return { lignes: [], erreur: "Clé Resend non configurée" };
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { data, error } = await resend.emails.list({ limit: limite });
+    if (error || !data) return { lignes: [], erreur: error?.message ?? "Réponse vide de Resend" };
+    return {
+      lignes: data.data.map((m) => ({ date: new Date(m.created_at), sujet: m.subject, statut: m.last_event })),
+    };
+  } catch (e) {
+    return { lignes: [], erreur: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 export async function envoyerMail(sujet: string, html: string) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const { error } = await resend.emails.send({

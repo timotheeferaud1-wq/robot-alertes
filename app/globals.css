@@ -43,3 +43,23 @@ dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
 .rouge { color: var(--baisse); }
 .signal { margin: 14px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); border-radius: 6px; font-size: 14px; }
 .mention { color: var(--discret); font-size: 12px; margin-top: 28px; }
+
+.prix small { font-size: 15px; font-weight: 600; margin-left: 6px; }
+.vert { color: var(--hausse); }
+section { margin-top: 40px; }
+.titre-section { font-size: 20px; margin: 0 0 14px; }
+.tableau { overflow-x: auto; background: var(--carte); border: 1px solid var(--bordure); border-radius: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+th { text-align: left; font-weight: 600; color: var(--discret); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+th, td { padding: 10px 14px; border-bottom: 1px solid var(--bordure); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: none; }
+td.nom { font-weight: 600; }
+.bandes { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.bande { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bande .nom { font-size: 14px; font-weight: 600; min-width: 220px; }
+.cases { display: flex; gap: 3px; }
+.case { width: 14px; height: 14px; border-radius: 3px; background: var(--bordure); }
+.c-vert { background: var(--hausse); }
+.c-rouge { background: var(--baisse); }
+.legende, .vide { color: var(--discret); font-size: 13px; margin: 4px 0 0; }
+.explication { background: var(--carte); border: 1px solid var(--bordure); border-radius: 14px; padding: 4px 18px; margin-bottom: 14px; font-size: 14px; line-height: 1.5; }
