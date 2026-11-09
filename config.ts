@@ -11,6 +11,12 @@ export const ACTIFS = [
   // { symbole: "AAPL", nom: "Apple" },
 ];
 
+/**
+ * true  : un « bilan du soir » est envoyé chaque soir de semaine, signal ou pas.
+ * false : un mail seulement quand un nouveau signal apparaît.
+ */
+export const ENVOI_QUOTIDIEN = true;
+
 /** Les règles qui déclenchent une alerte. */
 export const REGLES = {
   /** Moyennes mobiles (en jours de bourse) pour détecter les changements de tendance. */

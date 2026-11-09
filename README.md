@@ -25,6 +25,8 @@ Tout se passe dans `config.ts`. Après modification, pousse sur GitHub et Vercel
    - `RESEND_API_KEY` : ta clé Resend
    - `EMAIL_DESTINATAIRE` : l'adresse de ton compte Resend
    - `CRON_SECRET` : un long mot de passe aléatoire de ton choix
+   - `MOT_DE_PASSE_SITE` : le mot de passe pour ouvrir le tableau de bord (n'importe quel identifiant + ce mot de passe)
+   - `PORTEFEUILLE` (facultatif) : tes positions, voir plus bas
 4. Déploie. La tâche planifiée (dans `vercel.json`) se déclenche du lundi au vendredi
    entre 22 h et 23 h UTC (23 h – minuit à Paris en hiver), après la clôture des marchés.
 
@@ -45,3 +47,23 @@ npm install
 cp .env.example .env.local   # puis remplis les valeurs
 npm run dev                  # http://localhost:3000
 ```
+
+## Bilan du soir
+
+Avec `ENVOI_QUOTIDIEN = true` dans `config.ts`, tu reçois un mail chaque soir de semaine, signal ou pas.
+Pour chaque actif, le bilan indique, **dans les situations passées comparables à aujourd'hui**
+(même tendance, même écart au plus haut), à quelle fréquence le prix était plus haut
+1 mois, 3 mois, 6 mois et 1 an plus tard. C'est une statistique sur le passé, pas une prévision.
+
+## Mon portefeuille (lecture seule)
+
+Ajoute dans Vercel une variable `PORTEFEUILLE` au format JSON (une ligne par position) :
+
+```
+[{"symbole":"CW8.PA","nom":"MSCI World","quantite":2,"prixRevient":520.5},
+ {"symbole":"AAPL","nom":"Apple","quantite":5,"prixRevient":180}]
+```
+
+Les symboles sont ceux de finance.yahoo.com. Le portefeuille n'est jamais écrit dans le code
+ni sur GitHub, et il ne s'affiche que si `MOT_DE_PASSE_SITE` est défini.
+Après un changement de variable, relance un déploiement dans Vercel (*Deployments* → *Redeploy*).

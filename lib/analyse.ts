@@ -4,27 +4,22 @@ export type Point = { date: Date; prix: number };
 
 export type TypeEvenement = "croisement_haussier" | "croisement_baissier" | "baisse";
 
-export type Evenement = {
-  type: TypeEvenement;
-  titre: string;
-  detail: string;
-};
+export type Evenement = { type: TypeEvenement; titre: string; detail: string };
 
 /** Un signal passé, avec ce que le marché a fait ensuite. */
 export type SignalPasse = Evenement & {
   date: Date;
   prix: number;
-  perf1Mois: number | null; // variation 21 séances après le signal
-  perfDepuis: number; // variation entre le signal et aujourd'hui
+  perf1Mois: number | null;
+  perfDepuis: number;
 };
 
-/** Récapitulatif des séances récentes. */
 export type Recap = {
   derniereSeance: number;
   semaine: number;
   mois: number;
   depuisJanvier: number;
-  seances: { date: Date; variation: number }[]; // 20 dernières séances
+  seances: { date: Date; variation: number }[];
   positives20: number;
   negatives20: number;
   positives60: number;
@@ -32,6 +27,26 @@ export type Recap = {
   meilleure: { date: Date; variation: number };
   pire: { date: Date; variation: number };
 };
+
+/**
+ * Score historique : « dans le passé, quand le marché était dans la même situation qu'aujourd'hui,
+ * à quelle fréquence était-il plus haut X mois plus tard ? »
+ */
+export type Echeance = {
+  libelle: string;
+  seances: number;
+  tauxHausse: number; // part des cas où le prix était plus haut à l'échéance
+  medianePerf: number; // variation médiane à l'échéance
+  pireCas: number; // 5 % des cas ont fait pire que ça
+  nbCas: number;
+};
+export type Score = {
+  situation: string;
+  depuis: Date;
+  echeances: Echeance[];
+};
+
+export type PointCourbe = { date: Date; prix: number; mmC: number; mmL: number };
 
 export type Analyse = {
   symbole: string;
@@ -42,81 +57,149 @@ export type Analyse = {
   mmLongue: number;
   tendance: "haussière" | "baissière";
   plusHaut: number;
-  baisseDepuisPlusHaut: number; // ex. -0.12 pour -12 %
-  evenements: Evenement[]; // signaux du jour (ceux qui déclenchent un mail)
-  historique: SignalPasse[]; // signaux de la dernière année, du plus récent au plus ancien
+  baisseDepuisPlusHaut: number;
+  evenements: Evenement[];
+  historique: SignalPasse[];
   recap: Recap;
+  score: Score | null;
+  courbe: PointCourbe[]; // 12 derniers mois
 };
 
-function moyenne(valeurs: number[]): number {
-  return valeurs.reduce((a, b) => a + b, 0) / valeurs.length;
-}
-
-function indicateurs(prix: number[], i: number) {
+/** Moyennes mobiles et écart au plus haut, calculés une fois pour toute la série. */
+function indicateursSerie(prix: number[]) {
   const { mmCourte: nC, mmLongue: nL, fenetrePlusHaut } = REGLES;
-  const mmC = moyenne(prix.slice(i - nC + 1, i + 1));
-  const mmL = moyenne(prix.slice(i - nL + 1, i + 1));
-  const haut = Math.max(...prix.slice(Math.max(0, i - fenetrePlusHaut + 1), i + 1));
-  return { mmC, mmL, haut, baisse: prix[i] / haut - 1 };
+  const n = prix.length;
+  const mmC = new Array<number>(n).fill(NaN);
+  const mmL = new Array<number>(n).fill(NaN);
+  const baisse = new Array<number>(n).fill(NaN);
+  const haut = new Array<number>(n).fill(NaN);
+  let sC = 0;
+  let sL = 0;
+  const fenetre: number[] = []; // file d'indices pour le maximum glissant
+  for (let i = 0; i < n; i++) {
+    sC += prix[i];
+    sL += prix[i];
+    if (i >= nC) sC -= prix[i - nC];
+    if (i >= nL) sL -= prix[i - nL];
+    if (i >= nC - 1) mmC[i] = sC / nC;
+    if (i >= nL - 1) mmL[i] = sL / nL;
+    while (fenetre.length && prix[fenetre[fenetre.length - 1]] <= prix[i]) fenetre.pop();
+    fenetre.push(i);
+    if (fenetre[0] <= i - fenetrePlusHaut) fenetre.shift();
+    haut[i] = prix[fenetre[0]];
+    baisse[i] = prix[i] / haut[i] - 1;
+  }
+  return { mmC, mmL, baisse, haut };
 }
 
-/** Les signaux déclenchés le jour i (comparaison avec le jour i-1). */
-function evenementsDuJour(prix: number[], i: number): Evenement[] {
-  const { mmCourte: nC, mmLongue: nL, seuilsBaisse } = REGLES;
-  const auj = indicateurs(prix, i);
-  const hier = indicateurs(prix, i - 1);
-  const evenements: Evenement[] = [];
+type Indic = ReturnType<typeof indicateursSerie>;
 
-  if (auj.mmC > auj.mmL && hier.mmC <= hier.mmL) {
+function evenementsDuJour(prix: number[], ind: Indic, i: number): Evenement[] {
+  const { mmCourte: nC, mmLongue: nL, seuilsBaisse } = REGLES;
+  const { mmC, mmL, baisse, haut } = ind;
+  const evenements: Evenement[] = [];
+  if (!(i >= nL) || Number.isNaN(mmL[i - 1])) return evenements;
+
+  if (mmC[i] > mmL[i] && mmC[i - 1] <= mmL[i - 1]) {
     evenements.push({
       type: "croisement_haussier",
       titre: "Signal d'achat : la tendance repasse à la hausse",
-      detail: `La moyenne ${nC} jours (${auj.mmC.toFixed(2)}) vient de repasser au-dessus de la moyenne ${nL} jours (${auj.mmL.toFixed(2)}).`,
+      detail: `La moyenne ${nC} jours (${mmC[i].toFixed(2)}) vient de repasser au-dessus de la moyenne ${nL} jours (${mmL[i].toFixed(2)}).`,
     });
   }
-  if (auj.mmC < auj.mmL && hier.mmC >= hier.mmL) {
+  if (mmC[i] < mmL[i] && mmC[i - 1] >= mmL[i - 1]) {
     evenements.push({
       type: "croisement_baissier",
       titre: "Signal de vente : la tendance passe à la baisse",
-      detail: `La moyenne ${nC} jours (${auj.mmC.toFixed(2)}) vient de passer sous la moyenne ${nL} jours (${auj.mmL.toFixed(2)}).`,
+      detail: `La moyenne ${nC} jours (${mmC[i].toFixed(2)}) vient de passer sous la moyenne ${nL} jours (${mmL[i].toFixed(2)}).`,
     });
   }
   for (const s of seuilsBaisse) {
-    // On n'alerte que si le prix était resté au-dessus du seuil pendant tout le mois précédent
-    // (évite les alertes répétées quand le prix oscille autour du seuil).
-    const auDessusLeMoisDernier = Array.from({ length: 21 }, (_, k) => i - 1 - k)
-      .filter((j) => j >= REGLES.mmLongue)
-      .every((j) => indicateurs(prix, j).baisse > -s);
-    if (auj.baisse <= -s && auDessusLeMoisDernier) {
+    // Pas d'alerte répétée : le prix doit être resté au-dessus du seuil tout le mois précédent.
+    let auDessus = true;
+    for (let j = i - 1; j >= Math.max(0, i - 21); j--) if (baisse[j] <= -s) auDessus = false;
+    if (baisse[i] <= -s && auDessus) {
       evenements.push({
         type: "baisse",
         titre: `Baisse de plus de ${Math.round(s * 100)} % depuis le plus haut`,
-        detail: `Prix ${prix[i].toFixed(2)}, soit ${(auj.baisse * 100).toFixed(1)} % sous le plus haut d'un an (${auj.haut.toFixed(2)}).`,
+        detail: `Prix ${prix[i].toFixed(2)}, soit ${(baisse[i] * 100).toFixed(1)} % sous le plus haut d'un an (${haut[i].toFixed(2)}).`,
       });
     }
   }
   return evenements;
 }
 
+/** Tranche d'écart au plus haut, pour comparer des situations similaires. */
+function tranche(b: number): { id: number; libelle: string } {
+  if (b > -0.05) return { id: 0, libelle: "à moins de 5 % de son plus haut" };
+  if (b > -0.1) return { id: 1, libelle: "entre 5 et 10 % sous son plus haut" };
+  if (b > -0.2) return { id: 2, libelle: "entre 10 et 20 % sous son plus haut" };
+  return { id: 3, libelle: "à plus de 20 % sous son plus haut" };
+}
+
+const ECHEANCES = [
+  { libelle: "1 mois", seances: 21 },
+  { libelle: "3 mois", seances: 63 },
+  { libelle: "6 mois", seances: 126 },
+  { libelle: "1 an", seances: 252 },
+];
+
+function quantile(triees: number[], q: number) {
+  return triees[Math.min(triees.length - 1, Math.max(0, Math.floor(q * (triees.length - 1))))];
+}
+
+function scoreHistorique(serie: Point[], ind: Indic): Score | null {
+  const prix = serie.map((p) => p.prix);
+  const n = prix.length;
+  const { mmC, mmL, baisse } = ind;
+  const i0 = REGLES.mmLongue;
+  if (n - i0 < 600) return null; // pas assez d'historique pour que les statistiques aient un sens
+
+  const hausseAuj = mmC[n - 1] > mmL[n - 1];
+  const trancheAuj = tranche(baisse[n - 1]);
+  const echeances: Echeance[] = [];
+
+  for (const e of ECHEANCES) {
+    const perfs: number[] = [];
+    for (let i = i0; i + e.seances < n; i++) {
+      if (mmC[i] > mmL[i] === hausseAuj && tranche(baisse[i]).id === trancheAuj.id) {
+        perfs.push(prix[i + e.seances] / prix[i] - 1);
+      }
+    }
+    if (perfs.length < 50) continue;
+    perfs.sort((a, b) => a - b);
+    echeances.push({
+      ...e,
+      tauxHausse: perfs.filter((p) => p > 0).length / perfs.length,
+      medianePerf: quantile(perfs, 0.5),
+      pireCas: quantile(perfs, 0.05),
+      nbCas: perfs.length,
+    });
+  }
+  if (echeances.length === 0) return null;
+
+  return {
+    situation: `tendance ${hausseAuj ? "haussière" : "baissière"}, prix ${trancheAuj.libelle}`,
+    depuis: serie[i0].date,
+    echeances,
+  };
+}
+
 function recapitulatif(serie: Point[]): Recap {
   const prix = serie.map((p) => p.prix);
   const n = prix.length;
   const variations = serie.slice(1).map((p, k) => ({ date: p.date, variation: p.prix / prix[k] - 1 }));
-  const perf = (seances: number) => prix[n - 1] / prix[Math.max(0, n - 1 - seances)] - 1;
-
-  const anneeEnCours = serie[n - 1].date.getFullYear();
-  const idxDebutAnnee = serie.findIndex((p) => p.date.getFullYear() === anneeEnCours);
-  const refJanvier = prix[Math.max(0, idxDebutAnnee - 1)];
-
+  const perf = (s: number) => prix[n - 1] / prix[Math.max(0, n - 1 - s)] - 1;
+  const annee = serie[n - 1].date.getFullYear();
+  const idxJanvier = serie.findIndex((p) => p.date.getFullYear() === annee);
   const derniers = (k: number) => variations.slice(-k);
   const compte = (k: number, signe: 1 | -1) => derniers(k).filter((v) => v.variation * signe > 0).length;
   const sur60 = derniers(60);
-
   return {
     derniereSeance: variations[variations.length - 1].variation,
     semaine: perf(5),
     mois: perf(21),
-    depuisJanvier: prix[n - 1] / refJanvier - 1,
+    depuisJanvier: prix[n - 1] / prix[Math.max(0, idxJanvier - 1)] - 1,
     seances: derniers(20),
     positives20: compte(20, 1),
     negatives20: compte(20, -1),
@@ -127,21 +210,19 @@ function recapitulatif(serie: Point[]): Recap {
   };
 }
 
-/** Calcule les indicateurs du dernier jour, l'historique des signaux et le récap des séances. */
 export function analyser(symbole: string, nom: string, serie: Point[]): Analyse {
   const { mmLongue: nL } = REGLES;
-  if (serie.length < nL + 2) {
-    throw new Error(`${symbole} : pas assez d'historique (${serie.length} jours, il en faut ${nL + 2})`);
+  if (serie.length < nL + 25) {
+    throw new Error(`${symbole} : pas assez d'historique (${serie.length} jours, il en faut ${nL + 25})`);
   }
-
   const prix = serie.map((p) => p.prix);
   const n = prix.length;
-  const auj = indicateurs(prix, n - 1);
+  const ind = indicateursSerie(prix);
 
-  // Historique : on rejoue les règles sur chaque séance de la dernière année
+  const debut12Mois = Math.max(nL + 1, n - 252);
   const historique: SignalPasse[] = [];
-  for (let i = Math.max(nL + 1, n - 252); i < n; i++) {
-    for (const e of evenementsDuJour(prix, i)) {
+  for (let i = debut12Mois; i < n; i++) {
+    for (const e of evenementsDuJour(prix, ind, i)) {
       historique.push({
         ...e,
         date: serie[i].date,
@@ -153,18 +234,25 @@ export function analyser(symbole: string, nom: string, serie: Point[]): Analyse 
   }
   historique.reverse();
 
+  const courbe: PointCourbe[] = [];
+  for (let i = Math.max(nL - 1, n - 252); i < n; i++) {
+    courbe.push({ date: serie[i].date, prix: prix[i], mmC: ind.mmC[i], mmL: ind.mmL[i] });
+  }
+
   return {
     symbole,
     nom,
     date: serie[n - 1].date,
     prix: prix[n - 1],
-    mmCourte: auj.mmC,
-    mmLongue: auj.mmL,
-    tendance: auj.mmC > auj.mmL ? "haussière" : "baissière",
-    plusHaut: auj.haut,
-    baisseDepuisPlusHaut: auj.baisse,
-    evenements: evenementsDuJour(prix, n - 1),
+    mmCourte: ind.mmC[n - 1],
+    mmLongue: ind.mmL[n - 1],
+    tendance: ind.mmC[n - 1] > ind.mmL[n - 1] ? "haussière" : "baissière",
+    plusHaut: ind.haut[n - 1],
+    baisseDepuisPlusHaut: ind.baisse[n - 1],
+    evenements: evenementsDuJour(prix, ind, n - 1),
     historique,
     recap: recapitulatif(serie),
+    score: scoreHistorique(serie, ind),
+    courbe,
   };
 }

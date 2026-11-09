@@ -7,6 +7,8 @@
   --hausse: #1f8a4c;
   --baisse: #c8382b;
   --accent: #e4572e;
+  --bleu: #2d6cdf;
+  --orange: #e8961e;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -17,6 +19,8 @@
     --bordure: #2e2e2e;
     --hausse: #4cc27e;
     --baisse: #ff6b5e;
+    --bleu: #6a9cff;
+    --orange: #f2b04a;
   }
 }
 * { box-sizing: border-box; }
@@ -62,4 +66,37 @@ td.nom { font-weight: 600; }
 .c-vert { background: var(--hausse); }
 .c-rouge { background: var(--baisse); }
 .legende, .vide { color: var(--discret); font-size: 13px; margin: 4px 0 0; }
+.discret { color: var(--discret); font-size: 13px; margin: 0; }
+code { font-size: 13px; background: var(--bordure); padding: 1px 5px; border-radius: 4px; }
+
+.fiche { background: var(--carte); border: 1px solid var(--bordure); border-radius: 16px; padding: 20px; margin-bottom: 20px; }
+.fiche h2 { margin: 0; font-size: 19px; }
+.fiche-tete { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.fiche-tete .prix { margin: 8px 0 2px; }
+.fiche-chiffres { display: flex; flex-direction: column; gap: 10px; min-width: 230px; }
+.fiche-chiffres .badge { align-self: flex-start; }
+.titre-bloc { font-size: 15px; margin: 18px 0 10px; }
+
+.courbe { margin: 16px 0 0; }
+.courbe svg { width: 100%; height: auto; display: block; }
+.courbe .axe { font-size: 11px; fill: var(--discret); }
+.legende-courbe { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--discret); margin-top: 6px; }
+.legende-courbe span { display: inline-flex; align-items: center; gap: 6px; }
+.legende-courbe i { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+.legende-courbe b { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+.score .situation { margin: 0 0 12px; font-size: 14px; }
+.jauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.jauge { border: 1px solid var(--bordure); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.jauge-libelle { font-size: 12px; color: var(--discret); }
+.jauge-valeur { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.jauge-barre { height: 6px; border-radius: 3px; background: var(--bordure); overflow: hidden; }
+.jauge-barre span { display: block; height: 100%; background: var(--hausse); }
+.jauge-detail { font-size: 12px; color: var(--discret); line-height: 1.5; }
+.lecture { font-size: 13px; color: var(--discret); line-height: 1.5; margin: 12px 0 0; }
+
+.totaux { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 14px; }
+.totaux div { display: flex; flex-direction: column; gap: 2px; }
+.totaux b { font-size: 22px; }
+
 .explication { background: var(--carte); border: 1px solid var(--bordure); border-radius: 14px; padding: 4px 18px; margin-bottom: 14px; font-size: 14px; line-height: 1.5; }
